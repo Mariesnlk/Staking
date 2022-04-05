@@ -45,70 +45,33 @@ npx hardhat verify --network ropsten DEPLOYED_CONTRACT_ADDRESS "Hello, Hardhat!"
 
 For faster runs of your tests and scripts, consider skipping ts-node's type checking by setting the environment variable `TS_NODE_TRANSPILE_ONLY` to `1` in hardhat's environment. For more details see [the documentation](https://hardhat.org/guides/typescript.html#performance-optimizations).
 
-# Deploy
-Generating typings for: 29 artifacts in dir: typechain for target: ethers-v5
-Successfully generated 43 typings!
-Compiled 29 Solidity files successfully
-Token deployed to: 0x819152B00114ECB775509819b0F2467074AD9628
-Vesting deployed to: 0x96C305488e19c5520A4d39590B2574CA7b07279D
+# Deploy 
 
----
+Token deployed to: 0x82BD6cba3AA10cD100895aa8122bc9768b4e8D15
+Vendor deployed to: 0xF1F87140935E2499B94AFA1407C7bB80f432e3C9
+Staking deployed to: 0xEBa254acC7D9AD5826039f73474673e4e6aFe843
 
-No need to generate any newer typings.
-Deploying contracts with the account: 0xF8e2D0222c01668D7f7cfE38fcf0F41C30B4424c
-Upgradeable Vesting deployed to: 0x25D58C60b39DDbEEdEB4B84e6e580B9b41F7A89b
-Transparent Proxy deployed to: 0x5111133d6B5d7e68A5c70d64964d7A3288B4739a
-
-
-No need to generate any newer typings.
-Deploying contracts with the account: 0xF8e2D0222c01668D7f7cfE38fcf0F41C30B4424c
-Upgradeable Vesting deployed to: 0xAdC97887883bC93fa72d88e33EF7C538A9772B27
-Transparent Proxy deployed to: 0xf2772ecB4aaA10731Bd3F9d39F5B3B5cFcB07656
-Initialize implementtion
-
-# Verify
+# Verification
+Generating typings for: 12 artifacts in dir: typechain for target: ethers-v5
+Successfully generated 21 typings!
+Compiled 12 Solidity files successfully
 Successfully submitted source code for contract
-contracts/Token.sol:Token at 0x819152B00114ECB775509819b0F2467074AD9628
+contracts/StakingToken.sol:StakingToken at 0x82BD6cba3AA10cD100895aa8122bc9768b4e8D15
 for verification on the block explorer. Waiting for verification result...
 
-Successfully verified contract Token on Etherscan.
-https://ropsten.etherscan.io/address/0x819152B00114ECB775509819b0F2467074AD9628
-
----
+Successfully verified contract StakingToken on Etherscan.
+https://ropsten.etherscan.io/address/0x82BD6cba3AA10cD100895aa8122bc9768b4e8D15#code
 
 Successfully submitted source code for contract
-contracts/Vesting.sol:Vesting at 0x96C305488e19c5520A4d39590B2574CA7b07279D
+contracts/Vendor.sol:Vendor at 0xF1F87140935E2499B94AFA1407C7bB80f432e3C9
 for verification on the block explorer. Waiting for verification result...
 
-Successfully verified contract Vesting on Etherscan.
-https://ropsten.etherscan.io/address/0x96C305488e19c5520A4d39590B2574CA7b07279D#code
-
----
+Successfully verified contract Vendor on Etherscan.
+https://ropsten.etherscan.io/address/0xF1F87140935E2499B94AFA1407C7bB80f432e3C9#code
 
 Successfully submitted source code for contract
-contracts/VestingUpgradeable.sol:VestingUpgradeable at 0x5FF1E286f00BF8d2b00E0f4E7a31B876b0f9d15e
+contracts/Staking.sol:Staking at 0xEBa254acC7D9AD5826039f73474673e4e6aFe843
 for verification on the block explorer. Waiting for verification result...
 
-Successfully verified contract VestingUpgradeable on Etherscan.
-https://ropsten.etherscan.io/address/0x5FF1E286f00BF8d2b00E0f4E7a31B876b0f9d15e#code
-
----
-
-Successfully submitted source code for contract
-contracts/TransparentProxy.sol:TransparentProxy at 0x7641a45ECB613140e7B9E60A065Ff1411367C6D1
-for verification on the block explorer. Waiting for verification result...
-
-Successfully verified contract TransparentProxy on Etherscan.
-https://ropsten.etherscan.io/address/0x7641a45ECB613140e7B9E60A065Ff1411367C6D1#code
-
----
-
-**Proxy Contract with implementation**
-
-https://ropsten.etherscan.io/address/0x25D58C60b39DDbEEdEB4B84e6e580B9b41F7A89b#readProxyContract
-
-https://ropsten.etherscan.io/address/0xaf51cfdd8a9fcc909d154367e15357385579bb38#code
-
-
-
-
+Successfully verified contract Staking on Etherscan.
+https://ropsten.etherscan.io/address/0xEBa254acC7D9AD5826039f73474673e4e6aFe843#code

@@ -10,12 +10,12 @@ interface IStaking {
     );
     event Staked(address indexed sender, uint256 amount);
     event Unstaked(address indexed recipient, uint256 amount, uint256 reward);
+    event WithdrawFee(address beneficiary, uint256 amount);
 
     struct Stakeholder {
         bool isStaked;
         uint256 stakedAmount;
         uint256 stakeTime;
-        uint256 unstakeTime;
     }
 
     function setRewards(

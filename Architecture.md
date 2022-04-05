@@ -34,6 +34,8 @@ StakingToken inherits *ERC20* contact from OpenZeppelin.
 
 - **decreaseAllowance(address spender, uint256 subtractedValue)** - atomically decreases the allowance granted to spender by the caller;
 
+- **mint(address account, uint256 amount)** - creates amount of tokens and assigns them to account, increasing the total supply.
+
 ---
 
 ## Vendor
@@ -65,7 +67,6 @@ Have some static variables:
 - **staking period(60 days)**
 - **fee(40% of the earned reward)** - send to contract by the recipient if he wants unstake earlier than stake is will be finished
 - **staking cap(capability)** - 5mln = 5 000 000
-- **staking pool** - 500 000 tokens and APY 10%
 
 To calculate reward amount is using a formula
 
@@ -185,6 +186,16 @@ Arguments:
  - reward - amount of tokens after staking
 ```
 
+- ```WithdrawFee(address beneficiary, uint256 amount);```
+
+This event is emitted when owner wants to wthdraw unused tokens.
+
+Arguments:
+```
+ - beneficiary - address of the owner   
+ - amount - amount of unused tokens
+```
+
 ---
 
 ## Sequence diagram
@@ -210,12 +221,18 @@ The smart contracts inherit next SC from the **Openzeppelin** libraries verion *
 
 ## Risk and issues that can break the contract logic
 
-Overflow and underflow - when calculated rewards amount in Staking contract, add or subtract to the value using like this 
+1. Overflow and underflow - when calculated rewards amount in Staking contract, add or subtract to the value using like this 
 ```
 stakingPoolTotalAmount += _amount;
 ```
+2. Reordering attack - using public mapping than everyine in the blockchain can get info. Updating the condition at the beggining of the method. 
+3. Not set correct values as parameters in Staking contract. For exmple:
+```
+apy - is percantage value, but as part of params it should be as 800 for 8%
+```
+4. After rewards amount is setted should be transfer for Staking contract to calculate rewards for stakeholders and users cannot stake tokens until rewards amount will be 0.
 
-Reordering attack - using public mapping than everyine in the blockchain can get info. Updating the condition at the beggining of the method. 
+
 
 
 

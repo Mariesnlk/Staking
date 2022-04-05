@@ -3,10 +3,9 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract } from 'ethers'
-import { a, toETH, setCurrentTime } from './utils/utils'
+import { a, toETH } from './utils/utils'
 import chai from 'chai'
 import { solidity } from 'ethereum-waffle'
-import { doesNotReject } from "assert";
 chai.use(solidity)
 
 describe("Staking", () => {
@@ -93,17 +92,16 @@ describe("Staking", () => {
 
     it('Rewerted set rewards because apy is 0', async () => {
       await expect(staking.setRewards(startTime, finishTime, rewardsAmount, 0))
-        .to.be.revertedWith("Staking: apy should be more than zero");
+        .to.be.revertedWith("Staking: apy should be between 0 and 10");
     });
 
     it('Rewerted set rewards because apy is more than 10', async () => {
       await expect(staking.setRewards(startTime, finishTime, rewardsAmount, 1500))
-        .to.be.revertedWith("Staking: apy cannot be more than 10");
+        .to.be.revertedWith("Staking: apy should be between 0 and 10");
     });
 
     it('Should successfully set rewards', async () => {
-      await stakingToken.transfer(staking.address, rewardsAmount);
-
+      await stakingToken.approve(staking.address, rewardsAmount);
       await expect(
         staking.setRewards(startTime, finishTime, rewardsAmount, apy))
         .to.emit(staking, 'AddedReward')
@@ -112,11 +110,13 @@ describe("Staking", () => {
     });
 
     it('Rewerted set rewards because not correct time interval', async () => {
+      await stakingToken.approve(staking.address, rewardsAmount);
       await expect(staking.setRewards(finishTime, startTime, rewardsAmount, apy))
         .to.be.revertedWith("Staking: not correct time interval");
     });
 
     it('Rewerted set rewards because previous rewards period is not finished', async () => {
+      await stakingToken.approve(staking.address, rewardsAmount);
       await staking.setRewards(startTime, finishTime, rewardsAmount, apy);
 
       increaseTime = 60 * 60 * 24 * 5; // 5 days
@@ -131,18 +131,8 @@ describe("Staking", () => {
 
   describe('stake ', () => {
 
-    it('Rewerted stake because rewards interval is not started', async () => {
-      await stakingToken.transfer(staking.address, rewardsAmount);
-      await staking.setRewards(startTime, finishTime, rewardsAmount, apy);
-      const amountToStake = 1000;
-
-      await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
-      await expect(staking.connect(beneficiary1).stake(amountToStake))
-        .to.be.revertedWith("Staking: stake early than reward`s interval is started");
-    });
-
     it('Rewerted stake because amount should me more than 0', async () => {
-      await stakingToken.transfer(staking.address, rewardsAmount);
+      await stakingToken.approve(staking.address, rewardsAmount);
       await staking.setRewards(startTime, finishTime, rewardsAmount, apy);
 
       increaseTime = 60 * 60 * 24 * 5; // 5 days
@@ -156,7 +146,7 @@ describe("Staking", () => {
     });
 
     it('Rewerted stake because stake more than own', async () => {
-      await stakingToken.transfer(staking.address, rewardsAmount);
+      await stakingToken.approve(staking.address, rewardsAmount);
       await staking.setRewards(startTime, finishTime, rewardsAmount, apy);
 
       increaseTime = 60 * 60 * 24 * 5; // 5 days
@@ -169,8 +159,8 @@ describe("Staking", () => {
         .to.be.revertedWith("Staking: cannot stake more than you own");
     });
 
-    it('Should successfully stake', async () => {
-      await stakingToken.transfer(staking.address, rewardsAmount);
+    it('Successfully stake', async () => {
+      await stakingToken.approve(staking.address, rewardsAmount);
       await staking.setRewards(startTime, finishTime, rewardsAmount, apy);
 
       increaseTime = 60 * 60 * 24 * 5; // 5 days
@@ -194,108 +184,220 @@ describe("Staking", () => {
       expect(stakedAmount).to.be.equal(500);
       expect(stakeTime).to.be.equal(currectTimestamp);
       await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
-      // cannot stake second time in one period
-      await expect(staking.connect(beneficiary1).stake(amountToStake))
-        .to.be.revertedWith("Staking: all except of staker can call function");
 
     });
 
-    it('Rewerted stake because staking period is finished', async () => {
-      increaseTime = 60 * 60 * 24 * 31; // 31 days
+    it('Reverted stake because cooldown period is not finished', async () => {
+      await stakingToken.approve(staking.address, rewardsAmount);
+      await staking.setRewards(startTime, finishTime, rewardsAmount, apy);
+
+      increaseTime = 60 * 60 * 24 * 5; // 5 days
       await ethers.provider.send("evm_increaseTime", [increaseTime]);
       await ethers.provider.send("evm_mine", [])
 
-      const amountToStake = 1000;
-      await stakingToken.connect(beneficiary4).approve(staking.address, amountToStake);
-      await expect(staking.connect(beneficiary4).stake(amountToStake))
-        .to.be.revertedWith("Staking: stake lately than reward`s interval is finished");
+      let amountToStake = 100;
+      await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
+      await expect(
+        staking.connect(beneficiary1).stake(amountToStake)
+      )
+        .to.emit(staking, 'Staked')
+        .withArgs(beneficiary1.address, 100);
+
+      const blockNum = await ethers.provider.getBlockNumber();
+      const block = await ethers.provider.getBlock(blockNum);
+      const currectTimestamp = block.timestamp;
+
+      amountToStake = 400;
+      await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
+      await expect(staking.connect(beneficiary1).stake(amountToStake))
+        .to.be.revertedWith("Staking: cooldown period is not finished");
+
+      const [isStaked, stakedAmount, stakeTime, unstakeTime] = await staking.stakeholders(a(beneficiary1));
+      expect(isStaked).to.be.true;
+      expect(stakedAmount).to.be.equal(100);
+      expect(stakeTime).to.be.equal(currectTimestamp);
+
+    });
+
+    it('Successfully stake second time after cooldown is ended', async () => {
+      await stakingToken.approve(staking.address, rewardsAmount);
+      await staking.setRewards(startTime, finishTime, rewardsAmount, apy);
+
+      increaseTime = 60 * 60 * 24 * 5; // 5 days
+      await ethers.provider.send("evm_increaseTime", [increaseTime]);
+      await ethers.provider.send("evm_mine", [])
+
+      let amountToStake = 100;
+      await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
+      await expect(
+        staking.connect(beneficiary1).stake(amountToStake)
+      )
+        .to.emit(staking, 'Staked')
+        .withArgs(beneficiary1.address, 100);
+
+      increaseTime = 60 * 60 * 24 * 25; // 25 days
+      await ethers.provider.send("evm_increaseTime", [increaseTime]);
+      await ethers.provider.send("evm_mine", [])
+
+      amountToStake = 400;
+      await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
+      await expect(
+        staking.connect(beneficiary1).stake(amountToStake)
+      )
+        .to.emit(staking, 'Staked')
+        .withArgs(beneficiary1.address, 400);
+
+      const blockNum = await ethers.provider.getBlockNumber();
+      const block = await ethers.provider.getBlock(blockNum);
+      const currectTimestamp = block.timestamp;
+
+
+      const [isStaked, stakedAmount, stakeTime, unstakeTime] = await staking.stakeholders(a(beneficiary1));
+      expect(isStaked).to.be.true;
+      expect(stakedAmount).to.be.equal(500);
+      expect(stakeTime).to.be.equal(currectTimestamp);
+
+    });
+
+    it('Rewerted stake because available rewards is over', async () => {
+      finishTime = finishTime + 60 * 60 * 24 * 60; // 30 + 60 days 
+      await stakingToken.approve(staking.address, rewardsAmount);
+      await staking.setRewards(startTime, finishTime, 1, apy);
+
+      const amountToStake = 500;
+      await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
+      await expect(staking.connect(beneficiary1).stake(amountToStake))
+        .to.be.revertedWith("Staking: available rewards is over");
     });
 
   });
 
   describe('unstake', async () => {
 
-    it('unstake in first 10 days', async () => {
-      await stakingToken.transfer(staking.address, rewardsAmount);
-      await staking.setRewards(startTime, finishTime, rewardsAmount, apy);
-
-      increaseTime = 60 * 60 * 24 * 5; // 5 days
-      await ethers.provider.send("evm_increaseTime", [increaseTime]);
-      await ethers.provider.send("evm_mine", [])
-
+    it('Successfully unstake without reward if unstake time is before rewards period', async () => {
       const amountToStake = 500;
       await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
       await staking.connect(beneficiary1).stake(amountToStake);
 
-      increaseTime = 60 * 60 * 24 * 5; // 5 days
-      await ethers.provider.send("evm_increaseTime", [increaseTime]);
-      await ethers.provider.send("evm_mine", [])
-
       await expect(staking.connect(beneficiary1).unstake())
-        .to.be.revertedWith("Staking: cooldown period is not finished");
+        .to.emit(staking, 'Unstaked')
+        .withArgs(beneficiary1.address, 500, 0);
     });
 
 
-    it('unstake between 10-60 days', async () => {
-      await stakingToken.transfer(staking.address, rewardsAmount);
+    it('Successfully unstake without reward if stake time is after rewards period', async () => {
+      await stakingToken.approve(staking.address, rewardsAmount);
       await staking.setRewards(startTime, finishTime, rewardsAmount, apy);
-
-      increaseTime = 60 * 60 * 24 * 5; // 5 days
-      await ethers.provider.send("evm_increaseTime", [increaseTime]);
-      await ethers.provider.send("evm_mine", [])
-
-      const amountToStake = 500;
-      await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
-      await staking.connect(beneficiary1).stake(amountToStake);
-      await stakingToken.connect(beneficiary2).approve(staking.address, amountToStake);
-      await staking.connect(beneficiary2).stake(amountToStake);
 
       increaseTime = 60 * 60 * 24 * 35; // 35 days
       await ethers.provider.send("evm_increaseTime", [increaseTime]);
       await ethers.provider.send("evm_mine", [])
 
-      await staking.connect(beneficiary1).unstake();
-      await staking.connect(beneficiary2).unstake();
-
-      expect(await stakingToken.balanceOf(a(beneficiary1))).to.be.equal(1120);
-      expect(await stakingToken.balanceOf(a(beneficiary2))).to.be.equal(1120);
-
-      const [isStaked, stakedAmount, stakeTime, unstakeTime] = await staking.stakeholders(a(beneficiary1));
-      expect(isStaked).to.be.false;
-    });
-
-    it('unstake after 60 days', async () => {
-      await stakingToken.transfer(staking.address, rewardsAmount);
-      await staking.setRewards(startTime, finishTime, rewardsAmount, apy);
-
-      increaseTime = 60 * 60 * 24 * 5; // 5 days
-      await ethers.provider.send("evm_increaseTime", [increaseTime]);
-      await ethers.provider.send("evm_mine", [])
 
       const amountToStake = 500;
       await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
       await staking.connect(beneficiary1).stake(amountToStake);
-      await stakingToken.connect(beneficiary2).approve(staking.address, amountToStake);
-      await staking.connect(beneficiary2).stake(amountToStake);
+
+      await expect(staking.connect(beneficiary1).unstake())
+        .to.emit(staking, 'Unstaked')
+        .withArgs(beneficiary1.address, 500, 0);
+    });
+
+    it('Successfully unstake if staked time was before rewards period', async () => {
+      const amountToStake = 500;
+      await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
+      await staking.connect(beneficiary1).stake(amountToStake);
+
+      await stakingToken.approve(staking.address, rewardsAmount);
+      await staking.setRewards(startTime, finishTime, rewardsAmount, apy);
+
+      increaseTime = 60 * 60 * 24 * 35; // 35 days
+      await ethers.provider.send("evm_increaseTime", [increaseTime]);
+      await ethers.provider.send("evm_mine", [])
+
+      await expect(staking.connect(beneficiary1).unstake())
+        .to.emit(staking, 'Unstaked')
+        .withArgs(beneficiary1.address, 502, 2);
+    });
+
+    it('Successfully unstake before 60 days', async () => {
+      await stakingToken.approve(staking.address, rewardsAmount);
+      await staking.setRewards(startTime, finishTime, rewardsAmount, apy);
+
+      const amountToStake = 500;
+      await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
+      await staking.connect(beneficiary1).stake(amountToStake);
+
+      increaseTime = 60 * 60 * 24 * 30; // 30 days
+      await ethers.provider.send("evm_increaseTime", [increaseTime]);
+      await ethers.provider.send("evm_mine", [])
+
+      await expect(staking.connect(beneficiary1).unstake())
+        .to.emit(staking, 'Unstaked')
+        .withArgs(beneficiary1.address, 502, 2);
+
+    });
+
+    it('Successfully unstake after 60 days', async () => {
+      finishTime = finishTime + 60 * 60 * 24 * 60; // 30 + 60 days 
+      await stakingToken.approve(staking.address, rewardsAmount);
+      await staking.setRewards(startTime, finishTime, rewardsAmount, apy);
+
+      const amountToStake = 500;
+      await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
+      await staking.connect(beneficiary1).stake(amountToStake);
 
       increaseTime = 60 * 60 * 24 * 67; // 67 days
       await ethers.provider.send("evm_increaseTime", [increaseTime]);
       await ethers.provider.send("evm_mine", [])
 
-      await staking.connect(beneficiary1).unstake();
-      await staking.connect(beneficiary2).unstake();
-
-      expect(await stakingToken.balanceOf(a(beneficiary1))).to.be.equal(1007);
-      expect(await stakingToken.balanceOf(a(beneficiary2))).to.be.equal(1007);
-
-      const [isStaked, stakedAmount, stakeTime, unstakeTime] = await staking.stakeholders(a(beneficiary1));
-      expect(isStaked).to.be.false;
+      await expect(staking.connect(beneficiary1).unstake())
+        .to.emit(staking, 'Unstaked')
+        .withArgs(beneficiary1.address, 507, 7);
 
     });
 
     it('unstake reverted because caller is not stakeholder', async () => {
       await expect(staking.connect(beneficiary5).unstake())
         .to.be.revertedWith("Staking: Only staker can call function");
+    });
+
+
+    it('Successfully unstake if staked second time after cooldown', async () => {
+      await stakingToken.approve(staking.address, rewardsAmount);
+      finishTime = finishTime + 60 * 60 * 24 * 60; // 30 + 60 days 
+      await stakingToken.approve(staking.address, rewardsAmount);
+      await staking.setRewards(startTime, finishTime, rewardsAmount, apy);
+
+      let amountToStake = 100;
+      await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
+      await expect(
+        staking.connect(beneficiary1).stake(amountToStake)
+      )
+        .to.emit(staking, 'Staked')
+        .withArgs(beneficiary1.address, 100);
+
+      increaseTime = 60 * 60 * 24 * 40; // 40 days
+      await ethers.provider.send("evm_increaseTime", [increaseTime]);
+      await ethers.provider.send("evm_mine", [])
+
+      amountToStake = 400;
+      await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
+      await expect(
+        staking.connect(beneficiary1).stake(amountToStake)
+      )
+        .to.emit(staking, 'Staked')
+        .withArgs(beneficiary1.address, 400);
+
+
+      increaseTime = 60 * 60 * 24 * 80; // 80 days
+      await ethers.provider.send("evm_increaseTime", [increaseTime]);
+      await ethers.provider.send("evm_mine", [])
+
+      await expect(staking.connect(beneficiary1).unstake())
+      .to.emit(staking, 'Unstaked')
+      .withArgs(beneficiary1.address, 505, 5);
+
     });
 
   });
@@ -311,47 +413,33 @@ describe("Staking", () => {
         .to.be.revertedWith("Staking: contract has not tokens to withdraw");
     });
 
-    it('set rewards reverted because not all stakeholders unstake their tokens', async () => {
-      await stakingToken.transfer(staking.address, rewardsAmount);
-      await staking.setRewards(startTime, finishTime, rewardsAmount, apy);
+    it('withdraw tokens reverted because contract has no tokens to withdraw', async () => {
+      await expect(staking.withdrawAmounts())
+        .to.be.revertedWith("Staking: contract has not tokens to withdraw");
+    });
 
-      increaseTime = 60 * 60 * 24 * 5; // 5 days
-      await ethers.provider.send("evm_increaseTime", [increaseTime]);
-      await ethers.provider.send("evm_mine", [])
+    it('withdraw tokens as user`s fee', async () => {
+      await stakingToken.approve(staking.address, rewardsAmount);
+      await staking.setRewards(startTime, finishTime, rewardsAmount, 1000);
 
-      const amountToStake = 500;
+      const amountToStake = 1000;
       await stakingToken.connect(beneficiary1).approve(staking.address, amountToStake);
       await staking.connect(beneficiary1).stake(amountToStake);
-      await stakingToken.connect(beneficiary2).approve(staking.address, amountToStake);
-      await staking.connect(beneficiary2).stake(amountToStake);
-      await stakingToken.connect(beneficiary3).approve(staking.address, amountToStake);
-      await staking.connect(beneficiary3).stake(amountToStake);
 
-      increaseTime = 60 * 60 * 24 * 15; // 15 days
+      increaseTime = 60 * 60 * 24 * 40; // 40 days
       await ethers.provider.send("evm_increaseTime", [increaseTime]);
       await ethers.provider.send("evm_mine", [])
 
-      await staking.connect(beneficiary1).unstake();
-      await staking.connect(beneficiary2).unstake();
+      await expect(staking.connect(beneficiary1).unstake())
+        .to.emit(staking, 'Unstaked')
+        .withArgs(beneficiary1.address, 1005, 5);
 
-      const blockNumBefore = await ethers.provider.getBlockNumber();
-      const blockBefore = await ethers.provider.getBlock(blockNumBefore);
-      const timestampBefore = blockBefore.timestamp;
-      startTime = timestampBefore + 60 * 60 * 24 * 30; // 30 days
-      finishTime = startTime + 60 * 60 * 24 * 40; // 40 days
-
-      await expect(staking.setRewards(startTime, finishTime, rewardsAmount, apy))
-        .to.be.revertedWith("Staking: not all stakeholders unstake their tokens");
-
-      await staking.withdrawAmounts();
+      await expect(staking.withdrawAmounts())
+        .to.emit(staking, 'WithdrawFee')
+        .withArgs(owner.address, 3);
 
     });
+
   });
-
-  // Staking: staking capability is over
-
-  // "Staking: available rewards is over"
-
-  // "Staking: staking pool is over"
 
 });
